@@ -1,0 +1,18 @@
+# Developer-only additions. NEVER use on the shared test server.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Everything is published on 127.0.0.1 only: the Node inspector gives full code execution to
+# whoever can reach it, so it must never listen on a network interface of the host.
+services:
+  app:
+    environment:
+      NODE_ENV: development
+    # The inspector listens on all interfaces INSIDE the container (needed for port publishing),
+    # but the host only publishes it on loopback.
+    command: ["node", "--inspect=0.0.0.0:9229", "src/server.js"]
+    ports:
+      - "127.0.0.1:9229:9229"
+
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"

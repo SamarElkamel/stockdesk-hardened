@@ -1,2 +1,14 @@
 node_modules
 *.log
+
+# Local settings and secrets: never committed (see .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig*
+
+# CI by-products
+sbom*.json
+image.tar

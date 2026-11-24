@@ -1,0 +1,7 @@
+# Allow-list: ignore everything, then re-include only what the image needs.
+# Safer than a deny-list: a new secret file (.env.local, kubeconfig, *.pem...) is excluded by default.
+*
+!package.json
+!package-lock.json
+!src/
+!src/**

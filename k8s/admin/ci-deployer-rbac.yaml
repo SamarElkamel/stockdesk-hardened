@@ -1,0 +1,52 @@
+# Applied ONCE by a cluster admin (not by CI): kubectl apply -f k8s/admin/
+#
+# Replaces the current KUBECONFIG GitHub secret, whose rights nobody has checked (assumed: cluster-admin
+# on the shared cluster). The new credential can only manage StockDesk's own objects, in its own
+# namespace. It cannot read Secrets, cannot touch other namespaces, cannot change RBAC, cannot exec
+# into pods. How to build the kubeconfig from this ServiceAccount: README.md, "CI credential".
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ci-deployer
+  namespace: stockdesk
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ci-deployer
+  namespace: stockdesk
+rules:
+  # What "kubectl apply -k k8s/" creates or updates (no delete: apply does not prune).
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # Read-only, for "kubectl rollout status".
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-deployer
+  namespace: stockdesk
+subjects:
+  - kind: ServiceAccount
+    name: ci-deployer
+    namespace: stockdesk
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-deployer

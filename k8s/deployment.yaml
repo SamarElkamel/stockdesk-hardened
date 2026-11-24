@@ -1,12 +1,27 @@
+# StockDesk on the shared test cluster.
+# Applied by CI with "kubectl apply -k k8s/" (see k8s/kustomization.yaml), never with secrets inside.
+# Prerequisites created ONCE by a cluster admin (not by CI): k8s/admin/ and the "stockdesk-env" Secret
+# (see README.md, section "Kubernetes secrets").
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stockdesk
-  namespace: default
+  # Own namespace instead of "default" on a shared cluster: own RBAC, own NetworkPolicy,
+  # Pod Security "restricted" enforced on the namespace (k8s/admin/namespace.yaml).
+  namespace: stockdesk
   labels:
     app: stockdesk
 spec:
-  replicas: 1
+  # 2 replicas so that a node drain or a rollout does not stop the API (see k8s/pdb.yaml).
+  # NOTE: the demo keeps stock in memory, so each pod has its own copy. The comment in
+  # src/server.js says the real application reads PostgreSQL; if that is not true yet, set 1.
+  replicas: 2
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: stockdesk
@@ -15,40 +30,92 @@ spec:
       labels:
         app: stockdesk
     spec:
+      # The API never talks to the Kubernetes API: no service-account token in the pod.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000          # same numeric user as "USER 1000:1000" in the Dockerfile
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: stockdesk
-          image: registry.corvane.example/stockdesk:latest
+          # Placeholder on purpose: CI replaces it with the image DIGEST it has just built, scanned
+          # and pushed ("kustomize edit set image ...@sha256:..."). Applied by hand, this tag does not
+          # exist and the pod fails to pull: it fails closed instead of running an unknown "latest".
+          image: registry.corvane.example/stockdesk:set-by-ci
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
-              containerPort: 3000
-            - name: debug
-              containerPort: 9229
+              containerPort: 3000   # internal port unchanged; debug port 9229 removed
           envFrom:
+            # Non-secret settings (DB_HOST, DB_PORT, DB_USER, NODE_ENV, PORT): k8s/configmap.yaml
+            - configMapRef:
+                name: stockdesk-config
+            # Secrets only (DB_PASSWORD, API_KEY): created out of band, never stored in Git.
             - secretRef:
                 name: stockdesk-env
-          livenessProbe:
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          # Readiness = "can serve": checks the database. A DB outage removes the pod from the
+          # Service but does not restart it.
+          readinessProbe:
             httpGet:
               path: /health
               port: http
+            periodSeconds: 10
+            timeoutSeconds: 3        # > the 1 s DB check timeout in src/db.js (was 1 s: always racing)
+            failureThreshold: 3
+          # Liveness = "is the process stuck?": /livez does not depend on the DB, so a DB outage no
+          # longer makes every pod restart in a loop (the old probe used /health).
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
             initialDelaySeconds: 5
-            periodSeconds: 5
-            timeoutSeconds: 1
-            failureThreshold: 2
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp        # the app writes its startup marker file here
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: stockdesk
-  namespace: default
+  namespace: stockdesk
+  labels:
+    app: stockdesk
 spec:
+  # Still a LoadBalancer, because staff reach StockDesk through its address from the office and
+  # the VPN. But: HTTP port only (9229 removed) and only from known source ranges.
+  # This is NOT the supplier-facing setup: see THREAT-NOTE.md (Ingress + TLS, separate environment).
+  # TODO verify: if the cloud provider supports an "internal" load balancer annotation, prefer it.
   type: LoadBalancer
+  loadBalancerSourceRanges:
+    # TODO verify: replace with Corvane's real office and VPN egress ranges. Example values below
+    # (RFC 5737 documentation ranges): until replaced, nobody real can reach the service (fails closed).
+    - 198.51.100.0/24   # example: office public range
+    - 203.0.113.0/24    # example: VPN egress range
   selector:
     app: stockdesk
   ports:
     - name: http
       port: 80
       targetPort: http
-    - name: debug
-      port: 9229
-      targetPort: debug

@@ -1,0 +1,8 @@
+# Changes to the delivery chain need a review from a Corvane maintainer.
+# Only effective with branch protection on main: "Require review from Code Owners".
+# TODO verify: replace the placeholder with the real GitHub team (Corvane staff only, not contractors).
+/.github/            @corvane-labs/stockdesk-maintainers
+/Dockerfile          @corvane-labs/stockdesk-maintainers
+/.dockerignore       @corvane-labs/stockdesk-maintainers
+/docker-compose*.yml @corvane-labs/stockdesk-maintainers
+/k8s/                @corvane-labs/stockdesk-maintainers
