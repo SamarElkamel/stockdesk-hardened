@@ -1,0 +1,12 @@
+# Applied ONCE by a cluster admin (not by CI): kubectl apply -f k8s/admin/
+# Pod Security Admission "restricted": the API server itself refuses pods that run as root,
+# allow privilege escalation, keep capabilities, or have no seccomp profile.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stockdesk
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted

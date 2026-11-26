@@ -1,0 +1,19 @@
+# Non-secret settings, same environment variable names as before.
+# DB_HOST, DB_PORT and DB_USER used to sit in k8s/secret.yaml; they are not secrets.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stockdesk-config
+  namespace: stockdesk
+  labels:
+    app: stockdesk
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Was "db" while the app lived in the "default" namespace. Now that it has its own namespace the
+  # short name no longer resolves, so the full service name is used.
+  # TODO verify: where the PostgreSQL used by the test cluster really runs (a "db" Service in
+  # "default" is my assumption; it is not in this repository). Update k8s/networkpolicy.yaml too.
+  DB_HOST: "db.default.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_USER: "stockdesk"

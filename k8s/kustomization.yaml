@@ -1,0 +1,17 @@
+# What CI applies: "kubectl apply -k k8s/".
+# k8s/admin/ is deliberately NOT listed: namespace and RBAC are created by a cluster admin, so the
+# CI credential never needs the right to change its own permissions.
+# There is no Secret here on purpose (see README.md, "Kubernetes secrets").
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: stockdesk
+resources:
+  - configmap.yaml
+  - deployment.yaml
+  - networkpolicy.yaml
+  - pdb.yaml
+# CI runs: kustomize edit set image registry.corvane.example/stockdesk=registry.corvane.example/stockdesk@sha256:<digest>
+# which rewrites this entry for the run, so the cluster runs exactly the image that was scanned.
+images:
+  - name: registry.corvane.example/stockdesk
+    newTag: set-by-ci

@@ -1,0 +1,12 @@
+# Keep at least one StockDesk pod during voluntary disruptions (node drain, cluster upgrade).
+# Works with replicas: 2 in k8s/deployment.yaml. With 1 replica this would block node drains: remove it then.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: stockdesk
+  namespace: stockdesk
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: stockdesk

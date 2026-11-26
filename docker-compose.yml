@@ -1,26 +1,60 @@
-# Local and test-server stack for StockDesk.
+# StockDesk stack for local runs and for the shared test server.
+#
+#   cp .env.example .env      # then put your own values in .env (never committed, see .gitignore)
+#   docker compose up -d
+#
+# Debugging (Node inspector, direct DB access) lives in docker-compose.dev.yml and is opt-in only:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# (Deliberately NOT named docker-compose.override.yml: that name is loaded automatically, so the
+#  debug ports would come back on the shared test server without anyone noticing.)
 services:
   app:
     build: .
     ports:
-      - "3000:3000"
-      - "9229:9229"
-    env_file: .env
+      # Loopback only by default. On the shared test server, set APP_BIND in .env to the server's
+      # internal address (not 0.0.0.0 unless the host firewall restricts port 3000).
+      - "${APP_BIND:-127.0.0.1}:3000:3000"
+    # Same variable names as before; values come from .env. ":?" stops with an error if one is missing.
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: "3000"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: ${DB_USER:-stockdesk}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      API_KEY: ${API_KEY:?API_KEY must be set in .env}
     depends_on:
-      - db
-    restart: always
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
 
   db:
-    image: postgres:latest
+    # Pinned major instead of "latest".
+    # TODO verify BEFORE changing this on the shared test server: run
+    #   docker compose exec db postgres --version
+    # and put THAT major here. PostgreSQL refuses to start on a data volume created by another
+    # major version, and switching Debian -> Alpine can change collations on existing data.
+    # 17 is a placeholder; pin by digest once looked up.
+    image: postgres:17
     environment:
-      POSTGRES_USER: stockdesk
-      POSTGRES_PASSWORD: Sd-prod-2024-Zk93qP
+      POSTGRES_USER: ${DB_USER:-stockdesk}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
       POSTGRES_DB: stockdesk
-    ports:
-      - "5432:5432"
+    # No published port any more: the app reaches the database on the internal compose network.
+    # (It was 0.0.0.0:5432 on the shared test server, with a password that is in Git history.)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d stockdesk"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     volumes:
       - dbdata:/var/lib/postgresql/data
-    restart: always
+    restart: unless-stopped
 
 volumes:
   dbdata:

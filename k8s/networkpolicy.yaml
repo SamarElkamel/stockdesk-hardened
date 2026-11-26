@@ -1,0 +1,51 @@
+# Only effective if the cluster's network plugin enforces NetworkPolicy (Calico, Cilium...).
+# TODO verify which CNI the shared cluster runs; with one that ignores NetworkPolicy these objects do nothing.
+#
+# 1) Default deny for everything in the namespace, in and out.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: stockdesk
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+# 2) StockDesk: HTTP in on 3000; out only to DNS and to PostgreSQL.
+#    A compromised pod can no longer reach the rest of the shared cluster or the Internet
+#    (no exfiltration, no download of tools, no scanning of other teams' services).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: stockdesk
+  namespace: stockdesk
+spec:
+  podSelector:
+    matchLabels:
+      app: stockdesk
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # From any source on port 3000: traffic arrives through the LoadBalancer, whose
+    # loadBalancerSourceRanges does the source filtering (office / VPN).
+    - ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # TODO verify: matches the assumption in k8s/configmap.yaml (PostgreSQL in namespace "default").
+    # If the database is outside the cluster, replace this with an ipBlock for its address.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 5432
