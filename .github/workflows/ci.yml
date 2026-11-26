@@ -112,7 +112,12 @@ jobs:
   #     so that no workflow running on another branch or on a pull request can read them.
   release:
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Runs only when a repo admin sets the repository variable RELEASE_ENABLED=true, after the
+    # test-cluster environment and its secrets (DEPLOY_TOKEN, KUBECONFIG) exist. Until then the
+    # job is skipped instead of failing on an empty token (e.g. in a copy of this repo).
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
+      && vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: test-cluster
