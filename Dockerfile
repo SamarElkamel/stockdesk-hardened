@@ -16,7 +16,14 @@ WORKDIR /app
 # and any other local file can never end up in an image layer again.
 # Files stay owned by root: the application user can read them but not modify them.
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+# Then remove npm, npx, corepack and yarn: the app never needs them at runtime, and the image
+# scan found HIGH CVEs in npm's own bundled dependencies (undici, brace-expansion), not in the app.
+# Fewer tools in the image means less to exploit and fewer CVEs to track.
+RUN npm ci --omit=dev --ignore-scripts \
+ && npm cache clean --force \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+           /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+           /opt/yarn-v* /usr/local/bin/yarn /usr/local/bin/yarnpkg /root/.npm
 COPY src/ ./src/
 
 # Unprivileged user. Numeric UID/GID (1000 is the "node" user of the official image) so that
