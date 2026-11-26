@@ -7,7 +7,7 @@
 #   docker buildx imagetools inspect node:24-alpine   ->   FROM node:24-alpine@sha256:<digest>
 #   I could not look the digest up, so none is written here. Dependabot (see .github/dependabot.yml)
 #   then proposes digest updates as pull requests.
-FROM node:24-alpine
+FROM node:26-alpine
 
 ENV NODE_ENV=production
 WORKDIR /app
