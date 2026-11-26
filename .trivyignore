@@ -1,0 +1,9 @@
+# Accepted trivy findings. Each entry needs a reason and a review date.
+#
+# KSV-0056 (k8s/admin/ci-deployer-rbac.yaml): the CI deployer can create/update the Service and
+# the NetworkPolicy. It must, because "kubectl apply -k k8s/" applies them. The risk is limited:
+# the Role is namespace-scoped (stockdesk only), cannot read Secrets, delete, or change RBAC, and
+# the credential is only used by the main-only, reviewer-gated "test-cluster" environment.
+# Stronger option (not done): let a cluster admin own the Service and NetworkPolicy and remove
+# these verbs from the Role. Review by: 2027-02-28.
+KSV-0056

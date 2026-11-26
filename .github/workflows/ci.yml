@@ -64,7 +64,7 @@ jobs:
       - name: Misconfiguration scan of the Dockerfile and Kubernetes manifests (trivy config)
         run: >
           docker run --rm -v "$PWD:/repo:ro" "$TRIVY_IMAGE"
-          config --exit-code 1 --severity HIGH,CRITICAL /repo
+          config --exit-code 1 --severity HIGH,CRITICAL --ignorefile /repo/.trivyignore /repo
       - name: Render the Kubernetes manifests
         # kubectl is preinstalled on GitHub-hosted Ubuntu runners (TODO verify on the runner image).
         run: kubectl kustomize k8s/ > /dev/null
