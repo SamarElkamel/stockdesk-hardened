@@ -29,11 +29,9 @@ env:
   REGISTRY: registry.corvane.example
   IMAGE_NAME: stockdesk
   NODE_VERSION: "24"            # same major as the Dockerfile base image
-  # Scanner images: I could not look up current versions or digests, so the tags below are explicit
-  # placeholders. Until someone replaces them (TODO verify: latest release, then pin "@sha256:..."),
-  # the jobs fail at "docker pull" instead of silently running an unchecked tool version.
-  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:TODO-verify-version
-  TRIVY_IMAGE: aquasec/trivy:TODO-verify-version
+  # Scanner images: latest releases (gitleaks v8.30.1, trivy v0.76.2). TODO: also pin "@sha256:..." digests.
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1
+  TRIVY_IMAGE: aquasec/trivy:0.76.2
 
 jobs:
   test:
